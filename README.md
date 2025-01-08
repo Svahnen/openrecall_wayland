@@ -1,6 +1,6 @@
 # OpenRecall Wayland (Unofficial Fork)
 
-**Disclaimer**: This is an unofficial fork of [OpenRecall](https://github.com/openrecall/openrecall) that attempts to support Wayland-based Linux systems (e.g. Fedora Silverblue/Gnome). It replaces `mss` with [PyScreenshot](https://pyscreenshot.readthedocs.io) for Wayland capture. This approach is **temporary** until the official OpenRecall project natively implements Wayland support.
+**Disclaimer**: This is an unofficial fork of [OpenRecall](https://github.com/openrecall/openrecall) that attempts to support Wayland-based Linux systems (e.g. Fedora Silverblue/Gnome). It replaces `mss` with PyScreenshot for Wayland capture. This approach is **temporary** until the official OpenRecall project natively implements Wayland support.
 
 ---
 
