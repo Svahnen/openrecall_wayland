@@ -62,8 +62,8 @@ def take_screenshots(monitor=1):
         # (pyscreenshot doesn't handle multi-monitor as easily, so this is a single image)
         shot = pyscreenshot.grab()
         shot_np = np.array(shot)
-        # Convert from RGB to BGR so it's consistent with our existing approach
-        shot_np = shot_np[:, :, [2, 1, 0]]
+        # Pyscreenshot needs another order here in order for the color to look correct
+        shot_np = shot_np[:, :, [0, 1, 2]]
         screenshots.append(shot_np)
     else:
         # Non-Wayland fallback (MSS)
