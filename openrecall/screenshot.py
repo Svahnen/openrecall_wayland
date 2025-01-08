@@ -1,9 +1,11 @@
 import os
 import time
+import platform
 
 import mss
 import numpy as np
 from PIL import Image
+import pyscreenshot  # Make sure pyscreenshot is installed
 
 from openrecall.config import screenshots_path, args
 from openrecall.database import insert_entry
@@ -17,6 +19,7 @@ from openrecall.utils import (
 
 
 def mean_structured_similarity_index(img1, img2, L=255):
+    # This calculates the SSIM (Structural Similarity Index)
     K1, K2 = 0.01, 0.03
     C1, C2 = (K1 * L) ** 2, (K2 * L) ** 2
 
@@ -37,46 +40,72 @@ def mean_structured_similarity_index(img1, img2, L=255):
 
 
 def is_similar(img1, img2, similarity_threshold=0.9):
+    # Compare two screenshots using SSIM
     similarity = mean_structured_similarity_index(img1, img2)
     return similarity >= similarity_threshold
 
 
 def take_screenshots(monitor=1):
+    """
+    Takes screenshots of either:
+      - every monitor using MSS (default),
+      - or entire screen on Wayland (using pyscreenshot).
+    """
     screenshots = []
 
-    with mss.mss() as sct:
-        for monitor in range(len(sct.monitors)):
+    # Detect if we are on Linux + Wayland
+    is_linux = platform.system().lower() == "linux"
+    is_wayland = os.getenv("XDG_SESSION_TYPE", "").lower() == "wayland"
 
-            if args.primary_monitor_only and monitor != 1:
-                continue
-
-            monitor_ = sct.monitors[monitor]
-            screenshot = np.array(sct.grab(monitor_))
-            screenshot = screenshot[:, :, [2, 1, 0]]
-            screenshots.append(screenshot)
+    if is_linux and is_wayland:
+        # Wayland - use pyscreenshot to grab the entire screen
+        # (pyscreenshot doesn't handle multi-monitor as easily, so this is a single image)
+        shot = pyscreenshot.grab()
+        shot_np = np.array(shot)
+        # Convert from RGB to BGR so it's consistent with our existing approach
+        shot_np = shot_np[:, :, [2, 1, 0]]
+        screenshots.append(shot_np)
+    else:
+        # Non-Wayland fallback (MSS)
+        with mss.mss() as sct:
+            for idx, mon in enumerate(sct.monitors):
+                # If primary_monitor_only is True, only capture monitor #1
+                if args.primary_monitor_only and idx != 1:
+                    continue
+                screenshot = np.array(sct.grab(mon))
+                # Convert from BGRA to BGR in correct order for downstream usage
+                screenshot = screenshot[:, :, [2, 1, 0]]
+                screenshots.append(screenshot)
 
     return screenshots
 
 
 def record_screenshots_thread():
-    # TODO: fix the error from huggingface tokenizers
-    import os
-
+    """
+    Continuously takes screenshots, checks if they have changed
+    (using SSIM), and saves them along with extracted text to DB.
+    """
+    # Disables parallelism warnings from HF tokenizers if used.
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     last_screenshots = take_screenshots()
 
     while True:
         if not is_user_active():
+            # Sleep if user is inactive
             time.sleep(3)
             continue
 
         screenshots = take_screenshots()
-
+        # Compare new screenshots to old ones
         for i, screenshot in enumerate(screenshots):
+            if i >= len(last_screenshots):
+                # Just in case the number of screenshots changed
+                last_screenshots.append(screenshot)
 
             last_screenshot = last_screenshots[i]
 
+            # If the new screenshot is different enough, record it
             if not is_similar(screenshot, last_screenshot):
                 last_screenshots[i] = screenshot
                 image = Image.fromarray(screenshot)

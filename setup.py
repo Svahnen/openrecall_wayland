@@ -11,6 +11,7 @@ install_requires = [
     "Flask==3.0.3",
     "numpy==1.26.4",
     "mss==9.0.1",
+    "pyscreenshot==3.1",
     "sentence-transformers==3.0.0",
     "torch==2.2.0",
     "torchvision==0.17.0",
